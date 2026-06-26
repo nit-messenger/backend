@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: nit-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: nit-postgres
+    environment:
+      POSTGRES_DB: nit
+      POSTGRES_USER: nit
+      POSTGRES_PASSWORD: nitpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nit"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: nit-coturn
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/turnserver.conf
+    command: ["-c", "/etc/turnserver.conf"]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads_data:
