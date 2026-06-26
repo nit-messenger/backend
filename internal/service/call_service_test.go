@@ -5,7 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/corvych/nit/internal/config"
 	"github.com/corvych/nit/internal/model"
+	"github.com/corvych/nit/internal/ws"
 	"github.com/google/uuid"
 )
 
@@ -116,7 +118,13 @@ func TestCallService_Lifecycle(t *testing.T) {
 		participants: make(map[uuid.UUID][]model.CallParticipant),
 	}
 
-	callService := NewCallService(callRepo, convRepo)
+	cfg := &config.Config{
+		LiveKitURL:       "http://localhost:7880",
+		LiveKitAPIKey:    "devkey",
+		LiveKitAPISecret: "secret",
+	}
+	hub := ws.NewHub()
+	callService := NewCallService(callRepo, convRepo, hub, cfg)
 	ctx := context.Background()
 
 	// 1. Start Call

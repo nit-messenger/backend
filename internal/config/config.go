@@ -20,9 +20,9 @@ type Config struct {
 	JWTRefreshSecret  string
 	MediaStoragePath  string
 	MaxUploadBytes    int64
-	TURNServerAddr    string
-	TURNUsername      string
-	TURNPassword      string
+	LiveKitURL        string
+	LiveKitAPIKey     string
+	LiveKitAPISecret  string
 	VAPIDPublicKey    string
 	VAPIDPrivateKey   string
 }
@@ -50,9 +50,9 @@ func LoadConfig() *Config {
 		JWTRefreshSecret:  getEnv("JWT_REFRESH_SECRET", "supersecretjwtrefreshkey"),
 		MediaStoragePath:  getEnv("MEDIA_STORAGE_PATH", "./uploads"),
 		MaxUploadBytes:    maxUploadBytes,
-		TURNServerAddr:    getEnv("TURN_SERVER_ADDR", ""),
-		TURNUsername:      getEnv("TURN_USERNAME", ""),
-		TURNPassword:      getEnv("TURN_PASSWORD", ""),
+		LiveKitURL:        getEnv("LIVEKIT_URL", "http://localhost:7880"),
+		LiveKitAPIKey:     getEnv("LIVEKIT_API_KEY", "devkey"),
+		LiveKitAPISecret:  getEnv("LIVEKIT_API_SECRET", "secret"),
 		VAPIDPublicKey:    getEnv("VAPID_PUBLIC_KEY", ""),
 		VAPIDPrivateKey:   getEnv("VAPID_PRIVATE_KEY", ""),
 	}

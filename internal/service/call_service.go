@@ -4,8 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/corvych/nit/internal/config"
+	"github.com/corvych/nit/internal/livekit"
 	"github.com/corvych/nit/internal/model"
 	"github.com/corvych/nit/internal/repository"
+	"github.com/corvych/nit/internal/ws"
 	"github.com/google/uuid"
 )
 
@@ -23,6 +26,9 @@ type CallResponse struct {
 	CreatedAt      time.Time                 `json:"created_at"`
 	EndedAt        *time.Time                `json:"ended_at,omitempty"`
 	Participants   []CallParticipantResponse `json:"participants"`
+	LiveKitURL     string                    `json:"livekit_url,omitempty"`
+	LiveKitToken   string                    `json:"livekit_token,omitempty"`
+	RoomName       string                    `json:"room_name,omitempty"`
 }
 
 type CallParticipantResponse struct {
@@ -43,12 +49,16 @@ type CallService interface {
 type callService struct {
 	callRepo         repository.CallRepository
 	conversationRepo repository.ConversationRepository
+	hub              *ws.Hub
+	config           *config.Config
 }
 
-func NewCallService(cr repository.CallRepository, convRepo repository.ConversationRepository) CallService {
+func NewCallService(cr repository.CallRepository, convRepo repository.ConversationRepository, hub *ws.Hub, cfg *config.Config) CallService {
 	return &callService{
 		callRepo:         cr,
 		conversationRepo: convRepo,
+		hub:              hub,
+		config:           cfg,
 	}
 }
 
@@ -82,7 +92,51 @@ func (s *callService) StartCall(ctx context.Context, userID uuid.UUID, req Start
 	}
 	_ = s.callRepo.AddParticipant(ctx, part)
 
-	return s.getCallResponse(ctx, call.ID)
+	res, err := s.getCallResponse(ctx, call.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate LiveKit Token
+	roomName := res.ConversationID.String()
+	identity := userID.String()
+	token, err := livekit.GenerateToken(s.config.LiveKitAPIKey, s.config.LiveKitAPISecret, roomName, identity)
+	if err == nil {
+		res.LiveKitURL = s.config.LiveKitURL
+		res.LiveKitToken = token
+		res.RoomName = roomName
+	}
+
+	// Broadcast incoming call event to all participants
+	conv, err := s.conversationRepo.GetByID(ctx, req.ConversationID)
+	if err == nil && conv != nil {
+		pIDs := make([]uuid.UUID, len(conv.Participants))
+		for i, p := range conv.Participants {
+			pIDs[i] = p.UserID
+		}
+
+		callerName := "Someone"
+		for _, p := range res.Participants {
+			if p.UserID == userID {
+				if p.DisplayName != "" {
+					callerName = p.DisplayName
+				} else {
+					callerName = p.Username
+				}
+				break
+			}
+		}
+
+		s.hub.BroadcastToUsers("incoming_call", map[string]interface{}{
+			"call_id":         res.ID,
+			"conversation_id": res.ConversationID,
+			"type":            res.Type,
+			"caller_id":       userID,
+			"caller_name":     callerName,
+		}, pIDs)
+	}
+
+	return res, nil
 }
 
 func (s *callService) JoinCall(ctx context.Context, userID uuid.UUID, callID uuid.UUID) (*CallResponse, error) {
@@ -118,7 +172,22 @@ func (s *callService) JoinCall(ctx context.Context, userID uuid.UUID, callID uui
 		}
 	}
 
-	return s.getCallResponse(ctx, callID)
+	res, err := s.getCallResponse(ctx, callID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate LiveKit Token
+	roomName := res.ConversationID.String()
+	identity := userID.String()
+	token, err := livekit.GenerateToken(s.config.LiveKitAPIKey, s.config.LiveKitAPISecret, roomName, identity)
+	if err == nil {
+		res.LiveKitURL = s.config.LiveKitURL
+		res.LiveKitToken = token
+		res.RoomName = roomName
+	}
+
+	return res, nil
 }
 
 func (s *callService) LeaveCall(ctx context.Context, userID uuid.UUID, callID uuid.UUID) error {

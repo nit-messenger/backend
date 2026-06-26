@@ -3,7 +3,6 @@ package handler
 import (
 	"log"
 
-	"github.com/corvych/nit/internal/webrtc"
 	"github.com/corvych/nit/internal/ws"
 	"github.com/gofiber/contrib/v3/websocket"
 	"github.com/gofiber/fiber/v3"
@@ -23,7 +22,7 @@ func WSUpgradeHandler() fiber.Handler {
 }
 
 // WSConnHandler manages the actual websocket connection lifecycle
-func WSConnHandler(hub *ws.Hub, sfu *webrtc.SFUManager) fiber.Handler {
+func WSConnHandler(hub *ws.Hub) fiber.Handler {
 	return websocket.New(func(conn *websocket.Conn) {
 		userIDVal := conn.Locals("userID")
 		if userIDVal == nil {
@@ -44,7 +43,6 @@ func WSConnHandler(hub *ws.Hub, sfu *webrtc.SFUManager) fiber.Handler {
 			Conn:   conn,
 			UserID: userID,
 			Send:   make(chan []byte, 256),
-			SFU:    sfu,
 		}
 
 		// Register client with hub

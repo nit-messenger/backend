@@ -16,7 +16,6 @@ import (
 	"github.com/corvych/nit/internal/repository"
 	"github.com/corvych/nit/internal/retention"
 	"github.com/corvych/nit/internal/service"
-	"github.com/corvych/nit/internal/webrtc"
 	"github.com/corvych/nit/internal/ws"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -33,7 +32,6 @@ func main() {
 	hub := ws.NewHub()
 	go hub.Run()
 
-	sfu := webrtc.ConfigureSFUManager(cfg)
 
 	// Start background retention worker (runs every 1 hour)
 	retentionCtx, cancelRetention := context.WithCancel(context.Background())
@@ -64,7 +62,7 @@ func main() {
 	pushService := service.NewPushService(pushRepo, cfg)
 	fedService := service.NewFederationService(nodeRepo)
 	messageService := service.NewMessageService(messageRepo, conversationRepo, hub, pushService, fedService)
-	callService := service.NewCallService(callRepo, conversationRepo)
+	callService := service.NewCallService(callRepo, conversationRepo, hub, cfg)
 	proxyService := service.NewProxyService(proxyRepo, cfg)
 
 	// Start proxy service worker
@@ -109,7 +107,7 @@ func main() {
 	fedAuthMiddleware := middleware.NewFederationAuth(nodeRepo)
 
 	// Register WebSocket Route (Public check → Auth Middleware → Conn Handler)
-	app.Get("/ws", handler.WSUpgradeHandler(), authMiddleware, handler.WSConnHandler(hub, sfu))
+	app.Get("/ws", handler.WSUpgradeHandler(), authMiddleware, handler.WSConnHandler(hub))
 
 	// Register TUS Upload Route
 	app.All("/api/uploads/*", authMiddleware, uploadHandler.HandleUpgrade)
